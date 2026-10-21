@@ -85,11 +85,15 @@ app.get('/api/health', async (req, res) => {
   const mongoose = require('mongoose');
   let dbStatus = 'desconectado';
   let erroDetalhe = null;
+  let nomeBanco = null;
+  let totalUsuarios = null;
 
   try {
     if (process.env.MONGODB_URI) {
       await connectDB();
       dbStatus = 'conectado';
+      nomeBanco = mongoose.connection.name;
+      totalUsuarios = await require('./models/Usuario').countDocuments();
     }
   } catch (err) {
     dbStatus = 'erro_conexao';
@@ -101,6 +105,8 @@ app.get('/api/health', async (req, res) => {
     timestamp: new Date().toISOString(),
     servico: 'Sistema de Gerenciamento do Setor de Provas',
     bancoDeDados: dbStatus,
+    nomeBanco,
+    totalUsuarios,
     ...(erroDetalhe && { erro: erroDetalhe })
   });
 });
