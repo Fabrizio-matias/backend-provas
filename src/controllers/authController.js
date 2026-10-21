@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const Usuario = require('../models/Usuario');
 const { registrarAtividade } = require('../services/atividadeService');
-const { ACOES_AUDITORIA } = require('../utils/constants');
+const { ACOES_AUDITORIA, PERFIS } = require('../utils/constants');
 
 const gerarToken = (usuario) => {
   const secret = process.env.JWT_SECRET || 'secret_fallback_key_setor_provas';
@@ -79,6 +79,64 @@ const login = async (req, res, next) => {
   }
 };
 
+// POST /api/auth/registro
+const registro = async (req, res, next) => {
+  try {
+    const { nome, email, senha, codigo } = req.body;
+
+    if (!nome || !email || !senha) {
+      return res.status(400).json({
+        success: false,
+        message: 'Informe nome, e-mail e senha.'
+      });
+    }
+
+    if (senha.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'A senha deve ter no mínimo 6 caracteres.'
+      });
+    }
+
+    const emailNormalizado = email.toLowerCase().trim();
+    const existente = await Usuario.findOne({ email: emailNormalizado });
+    if (existente) {
+      return res.status(409).json({
+        success: false,
+        message: 'Já existe uma conta com esse e-mail.'
+      });
+    }
+
+    // sem codigo valido a conta nasce como professor
+    const codigoAdmin = process.env.CODIGO_ADMIN;
+    const perfil = codigoAdmin && codigo === codigoAdmin ? PERFIS.ADMIN : PERFIS.PROFESSOR;
+
+    const usuario = await Usuario.create({
+      nome: nome.trim(),
+      email: emailNormalizado,
+      senha,
+      perfil
+    });
+
+    const token = gerarToken(usuario);
+
+    res.status(201).json({
+      success: true,
+      message: 'Conta criada com sucesso.',
+      token,
+      usuario: {
+        id: usuario._id,
+        nome: usuario.nome,
+        email: usuario.email,
+        perfil: usuario.perfil,
+        disciplinas: usuario.disciplinas
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // GET /api/auth/me
 const getMe = async (req, res) => {
   res.status(200).json({
@@ -104,6 +162,7 @@ const logout = async (req, res) => {
 
 module.exports = {
   login,
+  registro,
   getMe,
   logout
 };
